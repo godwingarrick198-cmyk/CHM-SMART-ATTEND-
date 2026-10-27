@@ -10,6 +10,7 @@ export default function Home() {
   const [fullName, setFullName] = useState('');
   const [matricNo, setMatricNo] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -18,19 +19,29 @@ export default function Home() {
     setNotice('');
     setBusy(true);
     try {
-      const supabase = createClient();
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signInWithOtp({
-          email: email.trim().toLowerCase(),
-          options: { emailRedirectTo: 'https://chm-smart-attend.vercel.app/auth/callback', shouldCreateUser: true, data: { full_name: fullName.trim(), matric_no: matricNo.trim().toUpperCase() } }
+        const response = await fetch('/api/auth/student-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fullName: fullName.trim(), matricNo: matricNo.trim().toUpperCase(), email: email.trim().toLowerCase(), password })
         });
-        if (error) throw error;
-        setNotice('Registration submitted. Check your Gmail for a secure sign-in link. Open it on this device to finish setting up your account.');
-      } else {
-        const response = await fetch('/api/auth/matric-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matricNo: matricNo.trim().toUpperCase() }) });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Login failed. Please try again.');
-        setNotice('A secure sign-in link has been sent to the email registered with this matric number. Check your inbox and open the link on this device.');
+        if (!response.ok) throw new Error(result.error || 'Could not create account. Please try again.');
+        setNotice('Student account created. You can now log in with your matric number and password.');
+        setMode('login');
+        setPassword('');
+      } else {
+        const response = await fetch('/api/auth/matric-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ matricNo: matricNo.trim().toUpperCase(), password })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Login failed. Please check your details.');
+        const supabase = createClient();
+        const { error } = await supabase.auth.setSession(result.session);
+        if (error) throw error;
+        window.location.href = '/dashboard';
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
@@ -69,15 +80,16 @@ export default function Home() {
               <label>Full name<input autoComplete="name" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Enter your name" /></label>
               <label>Matriculation number<input required value={matricNo} onChange={e => setMatricNo(e.target.value)} placeholder="e.g. CHM/2024/0001" /></label>
               <label>Gmail address<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@gmail.com" /></label>
+              <label>Password<input type="password" autoComplete="new-password" minLength={8} required value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
             </>}
             {mode === 'login' && <>
               <label>Matriculation number<input required value={matricNo} onChange={e => setMatricNo(e.target.value)} placeholder="Enter your matric number" /></label>
-              <p className="fieldHint">No password needed. We’ll email a secure sign-in link to the address registered with your matric number.</p>
+              <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" /></label>
             </>}
             <button className="submitButton" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in to portal' : 'Create student account'} <span>↗</span></button>
           </form>
           {notice && <div className="notice" role="status">{notice}</div>}
-          <div className="cardBottom"><span className="lockIcon">▣</span> Protected student access <span className="divider">·</span> Email link sign-in</div>
+          <div className="cardBottom"><span className="lockIcon">▣</span> Protected student access <span className="divider">·</span> Password sign-in</div>
           <p className="fieldHint" style={{ textAlign: 'center', marginTop: 14 }}><a href="/admin">Administrator sign in →</a></p>
         </section>
       </section>
