@@ -10,7 +10,6 @@ export default function Home() {
   const [fullName, setFullName] = useState('');
   const [matricNo, setMatricNo] = useState('');
   const [email, setEmail] = useState('');
-  const [passcode, setPasscode] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -21,18 +20,17 @@ export default function Home() {
     try {
       const supabase = createClient();
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signInWithOtp({
           email: email.trim().toLowerCase(),
-          password: passcode,
-          options: { emailRedirectTo: 'https://chm-smart-attend.vercel.app/auth/callback', data: { full_name: fullName.trim(), matric_no: matricNo.trim().toUpperCase() } }
+          options: { emailRedirectTo: 'https://chm-smart-attend.vercel.app/auth/callback', shouldCreateUser: true, data: { full_name: fullName.trim(), matric_no: matricNo.trim().toUpperCase() } }
         });
         if (error) throw error;
-        setNotice('Registration submitted. Your student profile is created automatically. Check your Gmail and confirm your email before logging in.');
+        setNotice('Registration submitted. Check your Gmail for a secure sign-in link. Open it on this device to finish setting up your account.');
       } else {
-        const response = await fetch('/api/auth/matric-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matricNo: matricNo.trim().toUpperCase(), password: passcode }) });
+        const response = await fetch('/api/auth/matric-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matricNo: matricNo.trim().toUpperCase() }) });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Login failed. Please try again.');
-        window.location.href = '/dashboard';
+        setNotice('A secure sign-in link has been sent to the email registered with this matric number. Check your inbox and open the link on this device.');
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
