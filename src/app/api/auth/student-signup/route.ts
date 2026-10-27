@@ -18,9 +18,10 @@ export async function POST(request: Request) {
     if (!url || !serviceKey) return NextResponse.json({ error: 'Registration service is not configured. Please contact the administrator.' }, { status: 503 });
 
     const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data: existing, error: lookupError } = await admin.from('profiles').select('id').or('matric_no.eq.' + matricNo.replace(/[,().]/g, '') + ',email.eq.' + email).limit(1);
-    if (lookupError) return NextResponse.json({ error: 'Could not validate student details. Please try again.' }, { status: 500 });
-    if (existing?.length) return NextResponse.json({ error: 'That matric number or email is already registered. Please log in instead.' }, { status: 409 });
+    const { data: byMatric, error: matricError } = await admin.from('profiles').select('id').eq('matric_no', matricNo).maybeSingle();
+    const { data: byEmail, error: emailError } = await admin.from('profiles').select('id').eq('email', email).maybeSingle();
+    if (matricError || emailError) return NextResponse.json({ error: 'Could not validate student details. Please try again.' }, { status: 500 });
+    if (byMatric || byEmail) return NextResponse.json({ error: 'That matric number or email is already registered. Please log in instead.' }, { status: 409 });
 
     const { data, error } = await admin.auth.admin.createUser({
       email,
