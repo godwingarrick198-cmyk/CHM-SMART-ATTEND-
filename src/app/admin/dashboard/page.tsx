@@ -1,57 +1,43 @@
 'use client';
-
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-
-type AdminRecord = { email: string | null; phone_e164: string };
-
+type Student = { id: string; full_name: string; matric_no: string; email: string };
+type Session = { id: string; title: string; starts_at: string; ends_at: string; is_open: boolean };
+type Attendance = { id: string; checked_in_at: string; student_id: string; session_id: string; profiles?: { full_name: string; matric_no: string } | null; attendance_sessions?: { title: string } | null };
 export default function AdminDashboardPage() {
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState('Checking administrator access…');
-
-  useEffect(() => {
-    let active = true;
-    async function checkAccess() {
-      const supabase = createClient();
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) { window.location.href = '/admin'; return; }
-      const { data, error } = await supabase.from('admin_users').select('email, phone_e164').eq('auth_user_id', userData.user.id).eq('active', true).maybeSingle();
-      if (!active) return;
-      if (error || !data) { await supabase.auth.signOut(); window.location.href = '/admin'; return; }
-      const record = data as AdminRecord;
-      setEmail(record.email ?? userData.user.email ?? '');
-      setPhone(record.phone_e164);
-      setStatus('Administrator email verified. Your admin session is active.');
-    }
-    void checkAccess();
-    return () => { active = false; };
-  }, []);
-
-  async function signOut() { await createClient().auth.signOut(); window.location.href = '/admin'; }
-
-  return (
-    <main className="shell">
-      <div className="ambient ambientOne" /><div className="ambient ambientTwo" />
-      <header className="topbar">
-        <a className="brand" href="/"><span className="brandMark">CHM</span><span className="brandWords"><strong>SMART ATTEND</strong><small>ADMIN DASHBOARD</small></span></a>
-        <button type="button" className="tab" onClick={signOut}>Sign out</button>
-      </header>
-      <section className="heroGrid">
-        <div className="intro">
-          <div className="eyebrow"><span /> ADMINISTRATOR ACCESS</div>
-          <h1>Welcome<br /><em>back.</em></h1>
-          <p className="lead">{status}</p>
-          {email && <p className="lead">Verified admin email: {email}</p>}
-          {phone && <p className="lead">Authorized admin number on record: {phone}</p>}
-        </div>
-        <section className="authCard">
-          <p className="overline">SETUP STATUS</p>
-          <h2>Admin sign-in is connected</h2>
-          <p className="lead">Email OTP sign-in and administrator access checks are in place. Attendance management tools are not available on this screen yet; they must be added before this dashboard can manage sessions or student records.</p>
-          <a className="submitButton" href="/" style={{ display: 'inline-flex', textDecoration: 'none', alignItems: 'center', justifyContent: 'center' }}>Return to portal ↗</a>
-        </section>
-      </section>
-    </main>
-  );
+ const [authorized,setAuthorized]=useState(false); const [loading,setLoading]=useState(true); const [notice,setNotice]=useState('');
+ const [students,setStudents]=useState<Student[]>([]); const [sessions,setSessions]=useState<Session[]>([]); const [records,setRecords]=useState<Attendance[]>([]);
+ const [title,setTitle]=useState('CHM Class'); const [start,setStart]=useState(''); const [end,setEnd]=useState(''); const [lat,setLat]=useState(''); const [lng,setLng]=useState(''); const [radius,setRadius]=useState('50'); const [busy,setBusy]=useState(false);
+ const supabase=createClient();
+ async function load(){
+  setLoading(true); const {data:u}=await supabase.auth.getUser(); if(!u.user){window.location.replace('/admin');return}
+  const {data:a}=await supabase.from('admin_users').select('id').eq('auth_user_id',u.user.id).eq('active',true).maybeSingle();
+  if(!a){await supabase.auth.signOut();window.location.replace('/admin');return} setAuthorized(true);
+  const [st,se,re,settings]=await Promise.all([
+   supabase.from('profiles').select('id,full_name,matric_no,email').order('full_name'),
+   supabase.from('attendance_sessions').select('id,title,starts_at,ends_at,is_open').order('starts_at',{ascending:false}).limit(30),
+   supabase.from('attendance_records').select('id,checked_in_at,student_id,session_id,profiles(full_name,matric_no),attendance_sessions(title)').order('checked_in_at',{ascending:false}).limit(100),
+   supabase.from('app_settings').select('latitude,longitude,radius_m').eq('id',1).maybeSingle()
+  ]);
+  setStudents((st.data??[]) as Student[]);setSessions((se.data??[]) as Session[]);setRecords((re.data??[]) as unknown as Attendance[]);
+  if(settings.data){setLat(settings.data.latitude==null?'':String(settings.data.latitude));setLng(settings.data.longitude==null?'':String(settings.data.longitude));setRadius(String(settings.data.radius_m??50))}
+  setLoading(false);
+ }
+ useEffect(()=>{void load()},[]);
+ async function createSession(e:FormEvent){e.preventDefault();setBusy(true);setNotice('');try{const {error}=await supabase.from('attendance_sessions').insert({title:title.trim(),starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),is_open:true});if(error)throw error;setNotice('Attendance session created and opened.');await load()}catch(err){setNotice(err instanceof Error?err.message:'Could not create session.')}finally{setBusy(false)}}
+ async function toggleSession(s:Session){setNotice('');const {error}=await supabase.from('attendance_sessions').update({is_open:!s.is_open}).eq('id',s.id);if(error)setNotice(error.message);else{setNotice(s.is_open?'Session closed.':'Session opened.');await load()}}
+ async function saveSettings(e:FormEvent){e.preventDefault();setBusy(true);setNotice('');try{if(!lat||!lng)throw new Error('Enter the classroom latitude and longitude.');const {error}=await supabase.from('app_settings').upsert({id:1,latitude:Number(lat),longitude:Number(lng),radius_m:Number(radius)},{onConflict:'id'});if(error)throw error;setNotice('GPS attendance zone saved.')}catch(err){setNotice(err instanceof Error?err.message:'Could not save settings.')}finally{setBusy(false)}}
+ async function useCurrentLocation(){navigator.geolocation.getCurrentPosition(p=>{setLat(p.coords.latitude.toFixed(7));setLng(p.coords.longitude.toFixed(7));setNotice('Device location filled in. Confirm this is the official classroom location, then save.')},()=>setNotice('Location permission is needed to capture the current location.'),{enableHighAccuracy:true,timeout:15000})}
+ async function signOut(){await supabase.auth.signOut();window.location.replace('/admin')}
+ if(loading)return <main className="dashboardShell"><div className="dashLoading">Loading administrator tools…</div></main>;
+ if(!authorized)return null;
+ return <main className="dashboardShell"><header className="dashHeader"><a className="brand" href="/"><span className="brandMark">CHM</span><span className="brandWords"><strong>SMART ATTEND</strong><small>ADMIN DASHBOARD</small></span></a><button className="dashGhost" onClick={signOut}>Sign out ↗</button></header>
+ <section className="dashContent"><div className="dashEyebrow">ADMINISTRATION / CONTROL CENTER</div><h1 className="dashTitle">Attendance,<br/><em>under control.</em></h1><p className="dashLead">Manage class sessions, GPS boundaries, and student attendance records.</p>{notice&&<div className="dashNotice" role="status">{notice}</div>}
+ <div className="statsGrid"><article className="statCard"><span>REGISTERED STUDENTS</span><strong>{students.length}</strong><small>Student profiles</small></article><article className="statCard"><span>OPEN SESSIONS</span><strong>{sessions.filter(s=>s.is_open).length}</strong><small>Currently enabled</small></article><article className="statCard"><span>RECENT CHECK-INS</span><strong>{records.length}</strong><small>Up to 100 recent records</small></article></div>
+ <section className="dashSection"><div className="sectionHeading"><div><span>01 / SESSION CONTROL</span><h2>Create attendance session</h2></div></div><form className="adminForm" onSubmit={createSession}><label>Session title<input required value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. CHM 312 Lecture"/></label><label>Starts at<input type="datetime-local" required value={start} onChange={e=>setStart(e.target.value)}/></label><label>Ends at<input type="datetime-local" required value={end} onChange={e=>setEnd(e.target.value)}/></label><button className="dashPrimary" disabled={busy}>Create and open session ↗</button></form>
+ <div className="recordList adminList">{sessions.map(s=><div className="recordRow" key={s.id}><span className={s.is_open?'recordCheck':'recordClosed'}>{s.is_open?'●':'—'}</span><div><strong>{s.title}</strong><small>{new Date(s.starts_at).toLocaleString()} – {new Date(s.ends_at).toLocaleString()}</small></div><button className="dashGhost" onClick={()=>void toggleSession(s)}>{s.is_open?'Close session':'Open session'}</button></div>)}{sessions.length===0&&<div className="emptyState">No sessions created yet.</div>}</div></section>
+ <section className="dashSection"><div className="sectionHeading"><div><span>02 / GPS SETTINGS</span><h2>Approved classroom zone</h2></div></div><form className="adminForm" onSubmit={saveSettings}><label>Latitude<input required type="number" step="any" value={lat} onChange={e=>setLat(e.target.value)} placeholder="e.g. 6.3"/></label><label>Longitude<input required type="number" step="any" value={lng} onChange={e=>setLng(e.target.value)} placeholder="e.g. 5.6"/></label><label>Allowed radius (metres)<input required type="number" min="10" max="1000" value={radius} onChange={e=>setRadius(e.target.value)}/></label><button type="button" className="dashGhost" onClick={useCurrentLocation}>Use this phone's location</button><button className="dashPrimary" disabled={busy}>Save GPS zone</button></form><p className="privacyNote">Use the official classroom location, not your current position unless you are physically at the classroom. GPS zone settings directly control check-in eligibility.</p></section>
+ <section className="dashSection"><div className="sectionHeading"><div><span>03 / STUDENT DIRECTORY</span><h2>Registered students</h2></div></div><div className="recordList">{students.map(s=><div className="recordRow" key={s.id}><span className="recordCheck">◉</span><div><strong>{s.full_name}</strong><small>{s.matric_no} · {s.email}</small></div></div>)}{students.length===0&&<div className="emptyState">No registered students yet.</div>}</div></section>
+ <section className="dashSection"><div className="sectionHeading"><div><span>04 / AUDIT LOG</span><h2>Recent check-ins</h2></div><button className="dashGhost" onClick={()=>void load()}>Refresh ↻</button></div><div className="recordList">{records.map(r=><div className="recordRow" key={r.id}><span className="recordCheck">✓</span><div><strong>{r.profiles?.full_name??'Student'} · {r.profiles?.matric_no??'No matric number'}</strong><small>{r.attendance_sessions?.title??'CHM session'} · {new Date(r.checked_in_at).toLocaleString()}</small></div><span className="recordStatus">RECORDED</span></div>)}{records.length===0&&<div className="emptyState">No attendance records yet.</div>}</div></section>
+ </section><footer className="dashFooter">CHM SMART ATTEND <span>© {new Date().getFullYear()}</span></footer></main>
 }
