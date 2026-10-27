@@ -27,9 +27,12 @@ export default function Home() {
           options: { emailRedirectTo: 'https://chm-smart-attend.vercel.app/auth/callback', data: { full_name: fullName.trim(), matric_no: matricNo.trim().toUpperCase() } }
         });
         if (error) throw error;
-        setNotice('Registration submitted. Check your Gmail and use the confirmation link. If you already registered, use the newest email link.');
+        setNotice('Registration submitted. Your student profile is created automatically. Check your Gmail and confirm your email before logging in.');
       } else {
-        setNotice('Matric-number login is not enabled yet. It will be connected to a secure server-side lookup before launch.');
+        const response = await fetch('/api/auth/matric-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matricNo: matricNo.trim().toUpperCase(), password: passcode }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Login failed. Please try again.');
+        window.location.href = '/dashboard';
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
@@ -72,7 +75,7 @@ export default function Home() {
             {mode === 'login' && <>
               <label>Matriculation number<input required value={matricNo} onChange={e => setMatricNo(e.target.value)} placeholder="Enter your matric number" /></label>
               <label>Passcode<input type="password" autoComplete="current-password" minLength={8} required value={passcode} onChange={e => setPasscode(e.target.value)} placeholder="Enter your passcode" /></label>
-              <p className="fieldHint">Secure matric-number login will be connected before launch.</p>
+              <p className="fieldHint">Use the matriculation number and passcode you registered with.</p>
             </>}
             {mode === 'signup' && <label>Choose a passcode<input type="password" autoComplete="new-password" minLength={8} required value={passcode} onChange={e => setPasscode(e.target.value)} placeholder="At least 8 characters" /><small>Use at least 8 characters. Keep it private.</small></label>}
             <button className="submitButton" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in to portal' : 'Create student account'} <span>↗</span></button>
