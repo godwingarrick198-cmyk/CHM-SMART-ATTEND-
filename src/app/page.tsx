@@ -79,6 +79,7 @@ export default function Home() {
           </form>
           {notice && <div className="notice" role="status">{notice}</div>}
           <div className="cardBottom"><span className="lockIcon">▣</span> Protected student access <span className="divider">·</span> Email verification required</div>
+          <p className="fieldHint" style={{ textAlign: 'center', marginTop: 14 }}><a href="/admin">Administrator sign in →</a></p>
         </section>
       </section>
       <footer className="footer"><span>CHM SMART ATTEND</span><span>Attendance made accountable.</span><span>© {new Date().getFullYear()}</span></footer>
