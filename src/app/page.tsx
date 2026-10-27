@@ -24,10 +24,10 @@ export default function Home() {
         const { error } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(),
           password: passcode,
-          options: { emailRedirectTo: window.location.origin, data: { full_name: fullName.trim(), matric_no: matricNo.trim().toUpperCase() } }
+          options: { emailRedirectTo: 'https://chm-smart-attend.vercel.app/auth/callback', data: { full_name: fullName.trim(), matric_no: matricNo.trim().toUpperCase() } }
         });
         if (error) throw error;
-        setNotice('Registration submitted. Check your Gmail and verify your email before logging in. Your matric number must be unique.');
+        setNotice('Registration submitted. Check your Gmail and use the confirmation link. If you already registered, use the newest email link.');
       } else {
         setNotice('Matric-number login is not enabled yet. It will be connected to a secure server-side lookup before launch.');
       }
