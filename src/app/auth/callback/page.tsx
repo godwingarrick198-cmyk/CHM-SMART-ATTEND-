@@ -14,28 +14,39 @@ function AuthCallbackContent() {
 
     async function verify() {
       const errorCode = searchParams.get('error_code');
-      const errorDescription = searchParams.get('error_description');
-      if (errorCode || errorDescription) {
-        if (active) setMessage('Email verification failed. The link may have expired or already been used. Return to the portal and request a fresh confirmation email.');
-        return;
-      }
-
-      const code = searchParams.get('code');
-      if (!code) {
-        if (active) setMessage('No verification code was found. Open the newest confirmation email, or return to the portal and request a fresh link.');
+      if (errorCode || searchParams.get('error_description')) {
+        if (active) setMessage('This sign-in link could not be used. It may have expired or already been used. Return to the portal and request a new link.');
         return;
       }
 
       const supabase = createClient();
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      const code = searchParams.get('code');
+      const tokenHash = searchParams.get('token_hash');
+      const type = searchParams.get('type');
+
+      let error: { message: string } | null = null;
+      if (code) {
+        const result = await supabase.auth.exchangeCodeForSession(code);
+        error = result.error;
+      } else if (tokenHash && (type === 'magiclink' || type === 'signup' || type === 'email')) {
+        const result = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: type as 'magiclink' | 'signup' | 'email',
+        });
+        error = result.error;
+      } else {
+        if (active) setMessage('No valid sign-in token was found. Return to the portal and request a new link.');
+        return;
+      }
+
       if (error) {
-        if (active) setMessage('We could not complete verification. The link may have expired or already been used. Return to the portal and request a fresh confirmation email.');
+        if (active) setMessage('We could not complete sign-in. The link may have expired or already been used. Return to the portal and request a new link.');
         return;
       }
 
       if (active) {
-        setMessage('Email verified successfully. Redirecting you to CHM SMART ATTEND…');
-        window.setTimeout(() => router.replace('/?verified=1'), 1200);
+        setMessage('Sign-in successful. Redirecting you to CHM SMART ATTEND…');
+        window.setTimeout(() => router.replace('/?verified=1'), 800);
       }
     }
 
