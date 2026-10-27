@@ -74,14 +74,12 @@ export default function Home() {
             </>}
             {mode === 'login' && <>
               <label>Matriculation number<input required value={matricNo} onChange={e => setMatricNo(e.target.value)} placeholder="Enter your matric number" /></label>
-              <label>Passcode<input type="password" autoComplete="current-password" minLength={8} required value={passcode} onChange={e => setPasscode(e.target.value)} placeholder="Enter your passcode" /></label>
-              <p className="fieldHint">Use the matriculation number and passcode you registered with.</p>
+              <p className="fieldHint">No password needed. We’ll email a secure sign-in link to the address registered with your matric number.</p>
             </>}
-            {mode === 'signup' && <label>Choose a passcode<input type="password" autoComplete="new-password" minLength={8} required value={passcode} onChange={e => setPasscode(e.target.value)} placeholder="At least 8 characters" /><small>Use at least 8 characters. Keep it private.</small></label>}
             <button className="submitButton" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in to portal' : 'Create student account'} <span>↗</span></button>
           </form>
           {notice && <div className="notice" role="status">{notice}</div>}
-          <div className="cardBottom"><span className="lockIcon">▣</span> Protected student access <span className="divider">·</span> Email verification required</div>
+          <div className="cardBottom"><span className="lockIcon">▣</span> Protected student access <span className="divider">·</span> Email link sign-in</div>
           <p className="fieldHint" style={{ textAlign: 'center', marginTop: 14 }}><a href="/admin">Administrator sign in →</a></p>
         </section>
       </section>
