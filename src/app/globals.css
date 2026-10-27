@@ -54,3 +54,13 @@
 .dashLoading{min-height:80vh;display:grid;place-items:center;color:var(--muted);font-size:13px}
 .dashFooter{max-width:1120px;margin:0 auto;border-top:1px solid var(--line);padding:20px 0;display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:#819388;letter-spacing:.08em}
 @media(max-width:650px){.dashboardShell{padding:0 18px}.dashContent{padding:35px 0 48px}.statsGrid{grid-template-columns:1fr;gap:10px;margin-bottom:38px}.statCard{padding:17px}.statCard strong{margin:9px 0 5px}.dashHeader{height:72px}.recordStatus{display:none}.sectionHeading h2{font-size:21px}}
+
+
+.adminForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:20px;border:1px solid var(--line);border-radius:14px;background:rgba(25,42,35,.55)}
+.adminForm label{display:grid;gap:8px;color:#d2ddd3;font-size:11px;font-weight:700;min-width:0}
+.adminForm input{width:100%;min-width:0;border:1px solid rgba(207,228,211,.17);border-radius:9px;padding:12px;background:rgba(3,10,7,.25);color:var(--text);font:inherit;font-weight:400}
+.adminForm input:focus{outline:1px solid rgba(184,243,107,.6)}
+.adminForm button{align-self:end}
+.adminList{margin-top:14px}
+.recordClosed{display:grid;place-items:center;width:31px;height:31px;border-radius:9px;background:rgba(200,200,200,.08);color:#9aa99e}
+@media(max-width:650px){.adminForm{grid-template-columns:1fr;padding:15px}.adminForm button{width:100%}}
