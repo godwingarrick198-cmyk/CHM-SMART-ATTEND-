@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState('Verifying your email address…');
@@ -54,5 +54,13 @@ export default function AuthCallbackPage() {
         <a className="submitButton" href="/" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>Return to portal <span>↗</span></a>
       </section>
     </main>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<main className="shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>Loading email verification…</main>}>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
