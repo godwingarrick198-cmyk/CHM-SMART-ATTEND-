@@ -12,6 +12,7 @@ export default function StudentDashboard() {
   const [busyId, setBusyId] = useState('');
   const [loading, setLoading] = useState(true);
   const [totalClasses, setTotalClasses] = useState(20);
+  const [zone, setZone] = useState<{latitude:number;longitude:number;radius_m:number}|null>(null);
   const supabase = createClient();
   async function load() {
     setLoading(true);
@@ -21,19 +22,33 @@ export default function StudentDashboard() {
       supabase.from('profiles').select('full_name, matric_no, email').eq('id', auth.user.id).maybeSingle(),
       supabase.from('attendance_sessions').select('id, title, starts_at, ends_at, is_open').eq('is_open', true).order('starts_at'),
       supabase.from('attendance_records').select('id, checked_in_at, session_id, attendance_sessions(title)').eq('student_id', auth.user.id).order('checked_in_at', { ascending: false }).limit(100),
-      supabase.from('app_settings').select('total_classes').eq('id', 1).maybeSingle()
+      supabase.from('app_settings').select('total_classes,latitude,longitude,radius_m').eq('id', 1).maybeSingle()
     ]);
-    setProfile(p as Profile | null); setSessions((s ?? []) as Session[]); setRecords((r ?? []) as unknown as RecordRow[]); setTotalClasses(Math.max(1, Number(settings?.total_classes ?? 20))); setLoading(false);
+    setProfile(p as Profile | null); setSessions((s ?? []) as Session[]); setRecords((r ?? []) as unknown as RecordRow[]); setTotalClasses(Math.max(1, Number(settings?.total_classes ?? 20))); setZone(settings?.latitude != null && settings?.longitude != null ? {latitude:Number(settings.latitude),longitude:Number(settings.longitude),radius_m:Number(settings.radius_m??50)} : null); setLoading(false);
   }
   useEffect(() => { void load(); }, []);
+  function distanceMetres(lat1:number,lon1:number,lat2:number,lon2:number){const rad=(v:number)=>v*Math.PI/180;const dLat=rad(lat2-lat1),dLon=rad(lon2-lon1);const a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;return 6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
   async function checkIn(sessionId: string) {
-    setNotice(''); setBusyId(sessionId);
+    setNotice('Requesting a fresh, high-accuracy GPS reading…'); setBusyId(sessionId);
     if (!navigator.geolocation) { setNotice('Your browser does not support GPS location.'); setBusyId(''); return; }
     navigator.geolocation.getCurrentPosition(async pos => {
       try {
+        const accuracy = Math.round(pos.coords.accuracy);
+        if (zone) {
+          const distance = Math.round(distanceMetres(zone.latitude,zone.longitude,pos.coords.latitude,pos.coords.longitude));
+          const allowed = zone.radius_m;
+          if (distance > allowed) {
+            setNotice(`Check-in blocked: this phone is about ${distance} metres from the saved classroom pin, but the allowed radius is ${allowed} metres (${Math.round(allowed*3.28084)} feet). GPS accuracy is about ±${accuracy} metres. The map pin or radius may need adjustment in the admin dashboard. No attendance was recorded.`);
+            return;
+          }
+          if (accuracy > Math.max(25, allowed)) {
+            setNotice(`Your phone's GPS is only accurate to about ±${accuracy} metres. Move to an open area and try again for a more reliable reading.`);
+            return;
+          }
+        }
         const { error } = await supabase.rpc('student_check_in', { p_session_id: sessionId, p_latitude: pos.coords.latitude, p_longitude: pos.coords.longitude });
         if (error) throw error;
-        setNotice('Attendance recorded successfully.'); await load();
+        setNotice(`Attendance recorded successfully. GPS accuracy: about ±${accuracy} metres.`); await load();
       } catch (e) { setNotice(e instanceof Error ? e.message : 'Check-in failed.'); }
       finally { setBusyId(''); }
     }, (error) => {
@@ -47,7 +62,7 @@ export default function StudentDashboard() {
       }
       setNotice(message);
       setBusyId('');
-    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
   }
   const attendancePercent = Math.min(100, Math.round((records.length / totalClasses) * 100));
   async function signOut() { await supabase.auth.signOut(); window.location.replace('/'); }
