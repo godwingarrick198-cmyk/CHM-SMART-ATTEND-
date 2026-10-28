@@ -34,7 +34,18 @@ export default function StudentDashboard() {
         setNotice('Attendance recorded successfully.'); await load();
       } catch (e) { setNotice(e instanceof Error ? e.message : 'Check-in failed.'); }
       finally { setBusyId(''); }
-    }, () => { setNotice('Location permission is required. Enable location access and try again.'); setBusyId(''); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    }, (error) => {
+      let message = 'Could not get your location. Turn on Location on your phone and try again.';
+      if (error.code === error.PERMISSION_DENIED) {
+        message = 'Location access was blocked. On your phone, open Chrome Settings → Site settings → Location, allow chm-smart-attend.vercel.app, then return here and tap Check in with GPS again. Also make sure phone Location is turned on.';
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        message = 'Your phone could not determine your location. Turn on phone Location/GPS, move somewhere with a clearer signal, and try again.';
+      } else if (error.code === error.TIMEOUT) {
+        message = 'Location lookup timed out. Turn on phone Location/GPS and try again.';
+      }
+      setNotice(message);
+      setBusyId('');
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
   }
   async function signOut() { await supabase.auth.signOut(); window.location.replace('/'); }
   if (loading) return <main className="dashboardShell"><div className="dashLoading">Loading your student portal…</div></main>;
