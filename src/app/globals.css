@@ -64,3 +64,14 @@
 .adminList{margin-top:14px}
 .recordClosed{display:grid;place-items:center;width:31px;height:31px;border-radius:9px;background:rgba(200,200,200,.08);color:#9aa99e}
 @media(max-width:650px){.adminForm{grid-template-columns:1fr;padding:15px}.adminForm button{width:100%}}
+
+
+/* Interactive classroom map */
+.mapPickerWrap{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(25,42,35,.65)}
+.classroomMap{height:360px;width:100%;background:#17251e;z-index:0}
+.mapInstructions{padding:14px 16px;margin:0;color:#c4d6c7;font-size:11px;line-height:1.65}
+.mapPointStatus{padding:12px 16px;color:var(--green);font-family:'DM Mono',monospace;font-size:10px;overflow-wrap:anywhere;border-top:1px solid var(--line)}
+.mapLoading{height:360px;display:grid;place-items:center;border:1px solid var(--line);border-radius:14px;color:var(--muted);background:rgba(25,42,35,.65);font-size:12px}
+.mapSettingsForm{margin-top:14px}
+.leaflet-container{font-family:Manrope,Arial,sans-serif}
+@media(max-width:650px){.classroomMap,.mapLoading{height:320px}.mapInstructions{font-size:10px;padding:12px}}
