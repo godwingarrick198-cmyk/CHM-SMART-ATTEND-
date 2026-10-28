@@ -34,18 +34,8 @@ export default function StudentDashboard() {
     navigator.geolocation.getCurrentPosition(async pos => {
       try {
         const accuracy = Math.round(pos.coords.accuracy);
-        if (zone) {
-          const distance = Math.round(distanceMetres(zone.latitude,zone.longitude,pos.coords.latitude,pos.coords.longitude));
-          const allowed = zone.radius_m;
-          if (distance > allowed) {
-            setNotice(`Check-in blocked: this phone is about ${distance} metres from the saved classroom pin, but the allowed radius is ${allowed} metres (${Math.round(allowed*3.28084)} feet). GPS accuracy is about ±${accuracy} metres. The map pin or radius may need adjustment in the admin dashboard. No attendance was recorded.`);
-            return;
-          }
-          if (accuracy > Math.max(25, allowed)) {
-            setNotice(`Your phone's GPS is only accurate to about ±${accuracy} metres. Move to an open area and try again for a more reliable reading.`);
-            return;
-          }
-        }
+        // Let the server perform the authoritative geofence check. A phone's reported
+        // GPS accuracy can be poor indoors, so do not reject locally before the RPC.
         const { error } = await supabase.rpc('student_check_in', { p_session_id: sessionId, p_latitude: pos.coords.latitude, p_longitude: pos.coords.longitude });
         if (error) throw error;
         setNotice(`Attendance recorded successfully. GPS accuracy: about ±${accuracy} metres.`); await load();
