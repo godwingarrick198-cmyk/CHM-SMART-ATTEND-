@@ -75,3 +75,5 @@
 .mapSettingsForm{margin-top:14px}
 .leaflet-container{font-family:Manrope,Arial,sans-serif}
 @media(max-width:650px){.classroomMap,.mapLoading{height:320px}.mapInstructions{font-size:10px;padding:12px}}
+
+.adminPageNav{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 28px}.adminPageNav a,.adminQuickLinks a{display:inline-flex;padding:11px 14px;border:1px solid var(--line,#ddd);border-radius:12px;text-decoration:none;color:inherit;font-weight:600}.adminPageNav a.active{background:#102d28;color:#fff;border-color:#102d28}.adminQuickLinks{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:22px}.adminQuickLinks a{justify-content:space-between}@media(max-width:600px){.adminPageNav a{font-size:13px;padding:9px 10px}}
