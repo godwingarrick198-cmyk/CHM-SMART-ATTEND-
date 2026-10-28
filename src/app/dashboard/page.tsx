@@ -12,7 +12,6 @@ export default function StudentDashboard() {
   const [busyId, setBusyId] = useState('');
   const [loading, setLoading] = useState(true);
   const [totalClasses, setTotalClasses] = useState(20);
-  const [zone, setZone] = useState<{latitude:number;longitude:number;radius_m:number}|null>(null);
   const supabase = createClient();
   async function load() {
     setLoading(true);
@@ -22,9 +21,9 @@ export default function StudentDashboard() {
       supabase.from('profiles').select('full_name, matric_no, email').eq('id', auth.user.id).maybeSingle(),
       supabase.from('attendance_sessions').select('id, title, starts_at, ends_at, is_open').eq('is_open', true).order('starts_at'),
       supabase.from('attendance_records').select('id, checked_in_at, session_id, attendance_sessions(title)').eq('student_id', auth.user.id).order('checked_in_at', { ascending: false }).limit(100),
-      supabase.from('app_settings').select('total_classes,latitude,longitude,radius_m').eq('id', 1).maybeSingle()
+      supabase.from('app_settings').select('total_classes').eq('id', 1).maybeSingle()
     ]);
-    setProfile(p as Profile | null); setSessions((s ?? []) as Session[]); setRecords((r ?? []) as unknown as RecordRow[]); setTotalClasses(Math.max(1, Number(settings?.total_classes ?? 20))); setZone(settings?.latitude != null && settings?.longitude != null ? {latitude:Number(settings.latitude),longitude:Number(settings.longitude),radius_m:Number(settings.radius_m??50)} : null); setLoading(false);
+    setProfile(p as Profile | null); setSessions((s ?? []) as Session[]); setRecords((r ?? []) as unknown as RecordRow[]); setTotalClasses(Math.max(1, Number(settings?.total_classes ?? 20))); setLoading(false);
   }
   useEffect(() => { void load(); }, []);
   function distanceMetres(lat1:number,lon1:number,lat2:number,lon2:number){const rad=(v:number)=>v*Math.PI/180;const dLat=rad(lat2-lat1),dLon=rad(lon2-lon1);const a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;return 6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
