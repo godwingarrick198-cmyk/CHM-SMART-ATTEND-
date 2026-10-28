@@ -1,0 +1,1 @@
+import AdminSection from '../AdminSection'; export default function Page(){return <AdminSection/>}
