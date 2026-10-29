@@ -7,6 +7,7 @@ type RecordRow = { id: string; checked_in_at: string; session_id: string; attend
 export default function StudentDashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [courseSessions, setCourseSessions] = useState<Session[]>([]);
   const [records, setRecords] = useState<RecordRow[]>([]);
   const [notice, setNotice] = useState('');
   const [busyId, setBusyId] = useState('');
@@ -17,13 +18,14 @@ export default function StudentDashboard() {
     setLoading(true);
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) { window.location.replace('/'); return; }
-    const [{ data: p }, { data: s }, { data: r }, { data: settings }] = await Promise.all([
+    const [{ data: p }, { data: s }, { data: allSessions }, { data: r }, { data: settings }] = await Promise.all([
       supabase.from('profiles').select('full_name, matric_no, email').eq('id', auth.user.id).maybeSingle(),
       supabase.from('attendance_sessions').select('id, title, course_code, starts_at, ends_at, is_open').eq('is_open', true).order('starts_at'),
+      supabase.from('attendance_sessions').select('id, title, course_code, starts_at, ends_at, is_open').order('ends_at'),
       supabase.from('attendance_records').select('id, checked_in_at, session_id, attendance_sessions(title, course_code)').eq('student_id', auth.user.id).order('checked_in_at', { ascending: false }).limit(1000),
       supabase.from('app_settings').select('total_classes').eq('id', 1).maybeSingle()
     ]);
-    setProfile(p as Profile | null); setSessions((s ?? []) as Session[]); setRecords((r ?? []) as unknown as RecordRow[]); setTotalClasses(Math.max(1, Number(settings?.total_classes ?? 20))); setLoading(false);
+    setProfile(p as Profile | null); setSessions((s ?? []) as Session[]); setCourseSessions((allSessions ?? []) as Session[]); setRecords((r ?? []) as unknown as RecordRow[]); setTotalClasses(Math.max(1, Number(settings?.total_classes ?? 20))); setLoading(false);
   }
   useEffect(() => { void load(); }, []);
   function distanceMetres(lat1:number,lon1:number,lat2:number,lon2:number){const rad=(v:number)=>v*Math.PI/180;const dLat=rad(lat2-lat1),dLon=rad(lon2-lon1);const a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;return 6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
@@ -53,7 +55,7 @@ export default function StudentDashboard() {
       setBusyId('');
     }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
   }
-  const courseAttendance = records.reduce((groups, row) => { const code = row.attendance_sessions?.course_code || 'Unassigned'; groups[code] = (groups[code] || 0) + 1; return groups; }, {} as Record<string, number>); const attendancePercent = Math.min(100, Math.round((records.length / totalClasses) * 100));
+  const courseTotals = courseSessions.filter(s => new Date(s.ends_at).getTime() <= Date.now()).reduce((groups, s) => { const code = s.course_code || 'Unassigned'; groups[code] = (groups[code] || 0) + 1; return groups; }, {} as Record<string, number>); const courseAttendance = records.reduce((groups, row) => { const code = row.attendance_sessions?.course_code || 'Unassigned'; groups[code] = (groups[code] || 0) + 1; return groups; }, {} as Record<string, number>); const attendancePercent = Math.min(100, Math.round((records.length / totalClasses) * 100));
   async function signOut() { await supabase.auth.signOut(); window.location.replace('/'); }
   if (loading) return <main className="dashboardShell"><div className="dashLoading">Loading your student portal…</div></main>;
   return <main className="dashboardShell">
@@ -62,7 +64,7 @@ export default function StudentDashboard() {
       {!profile && <div className="dashNotice">Your student profile has not been created yet. Please contact the administrator before checking in.</div>}
       {notice && <div className="dashNotice" role="status">{notice}</div>}
       <div className="statsGrid"><article className="statCard"><span>MATRIC NUMBER</span><strong>{profile?.matric_no ?? 'Not available'}</strong><small>Registered student ID</small></article><article className="statCard"><span>CLASSES ATTENDED</span><strong>{records.length}</strong><small>Recorded check-ins</small></article><article className="statCard"><span>ATTENDANCE PROGRESS</span><strong>{attendancePercent}%</strong><small>{records.length} of {totalClasses} classes attended</small><div role="progressbar" aria-label="Attendance progress" aria-valuenow={attendancePercent} aria-valuemin={0} aria-valuemax={100} style={{height:8,marginTop:12,borderRadius:99,background:'rgba(255,255,255,0.12)',overflow:'hidden'}}><div style={{height:'100%',width:`${attendancePercent}%`,borderRadius:99,background:'var(--accent, #62e6b5)',transition:'width 250ms ease'}} /></div></article></div>
-      <section className="dashSection"><div className="sectionHeading"><div><span>COURSE BREAKDOWN</span><h2>Attendance by course code</h2></div></div>{Object.keys(courseAttendance).length===0 ? <div className="emptyState">Your course attendance totals will appear after your first check-in.</div> : <div className="statsGrid">{Object.entries(courseAttendance).sort(([a],[b])=>a.localeCompare(b)).map(([code,count])=><article className="statCard" key={code}><span>{code}</span><strong>{count}</strong><small>Recorded check-ins</small></article>)}</div>}</section>
+      <section className="dashSection"><div className="sectionHeading"><div><span>COURSE BREAKDOWN</span><h2>Attendance by course code</h2></div></div>{Object.keys(courseTotals).length===0 ? <div className="emptyState">Course percentages will appear after attendance sessions have ended.</div> : <div className="statsGrid">{Object.entries(courseTotals).sort(([a],[b])=>a.localeCompare(b)).map(([code,total])=>{const attended=courseAttendance[code]??0;const percent=Math.min(100,Math.round(attended/Math.max(1,total)*100));return <article className="statCard" key={code}><span>{code}</span><strong>{percent}%</strong><small>{attended} of {total} classes attended</small><div role="progressbar" aria-label={`${code} attendance`} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} style={{height:8,marginTop:12,borderRadius:99,background:'rgba(255,255,255,0.12)',overflow:'hidden'}}><div style={{height:'100%',width:`${percent}%`,borderRadius:99,background:'var(--accent, #62e6b5)',transition:'width 250ms ease'}} /></div></article>})}</div>}</section>
       <section className="dashSection"><div className="sectionHeading"><div><span>01 / LIVE SESSIONS</span><h2>Available check-ins</h2></div><button className="dashGhost" onClick={() => void load()}>Refresh ↻</button></div>
         {sessions.length === 0 ? <div className="emptyState"><span>◎</span><strong>No open attendance sessions</strong><p>When your lecturer or administrator opens a session, it will appear here.</p></div> : <div className="sessionGrid">{sessions.map(s => { const alreadyCheckedIn = records.some(row => row.session_id === s.id); return <article className="sessionCard" key={s.id}><div className="liveTag"><i/> SESSION OPEN</div><h3>{s.course_code} · {s.title}</h3><p>{new Date(s.starts_at).toLocaleString()} – {new Date(s.ends_at).toLocaleTimeString()}</p><button className="dashPrimary" disabled={!!busyId || !profile || alreadyCheckedIn} onClick={() => void checkIn(s.id)}>{alreadyCheckedIn ? 'Already checked in ✓' : busyId === s.id ? 'Checking location…' : 'Check in with GPS ↗'}</button></article>; })}</div>}
       </section>
