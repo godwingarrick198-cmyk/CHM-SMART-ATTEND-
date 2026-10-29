@@ -55,7 +55,20 @@ export default function StudentDashboard() {
       setBusyId('');
     }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
   }
-  const courseTotals = courseSessions.filter(s => new Date(s.ends_at).getTime() <= Date.now()).reduce((groups, s) => { const code = s.course_code || 'Unassigned'; groups[code] = (groups[code] || 0) + 1; return groups; }, {} as Record<string, number>); const courseAttendance = records.reduce((groups, row) => { const code = row.attendance_sessions?.course_code || 'Unassigned'; groups[code] = (groups[code] || 0) + 1; return groups; }, {} as Record<string, number>); const attendancePercent = Math.min(100, Math.round((records.length / totalClasses) * 100));
+  const normalizeCourseCode = (value?: string | null) => (value || 'Unassigned').trim().replace(/\\s+/g, ' ').toUpperCase();
+  const courseTotals = courseSessions
+    .filter(s => new Date(s.ends_at).getTime() <= Date.now())
+    .reduce((groups, s) => {
+      const code = normalizeCourseCode(s.course_code);
+      groups[code] = (groups[code] || 0) + 1;
+      return groups;
+    }, {} as Record<string, number>);
+  const courseAttendance = records.reduce((groups, row) => {
+    const code = normalizeCourseCode(row.attendance_sessions?.course_code);
+    groups[code] = (groups[code] || 0) + 1;
+    return groups;
+  }, {} as Record<string, number>);
+  const attendancePercent = Math.min(100, Math.round((records.length / totalClasses) * 100));
   async function signOut() { await supabase.auth.signOut(); window.location.replace('/'); }
   if (loading) return <main className="dashboardShell"><div className="dashLoading">Loading your student portal…</div></main>;
   return <main className="dashboardShell">
