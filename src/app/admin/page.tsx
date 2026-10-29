@@ -10,22 +10,6 @@ export default function AdminLoginPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
 
-  async function sendPasswordSetup() {
-    setBusy(true);
-    setNotice('');
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(ADMIN_EMAIL, {
-        redirectTo: `${window.location.origin}/admin/reset-password`,
-      });
-      if (error) throw error;
-      setNotice('Password setup link requested. Check the Gmail inbox and spam folder.');
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Could not request a password setup link.');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,9 +58,7 @@ export default function AdminLoginPage() {
             <label>Password<input type="password" autoComplete="current-password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter administrator password" /></label>
             <button className="submitButton" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in to admin dashboard'} <span>↗</span></button>
           </form>
-          <button className="submitButton" type="button" disabled={busy} onClick={sendPasswordSetup} style={{ marginTop: 12, background: 'transparent', border: '1px solid currentColor' }}>
-            {busy ? 'Please wait…' : 'Set / reset administrator password'}
-          </button>
+
           {notice && <div className="notice" role="status">{notice}</div>}
           <div className="cardBottom"><span className="lockIcon">▣</span> Public administrator signup is disabled</div>
         </section>
