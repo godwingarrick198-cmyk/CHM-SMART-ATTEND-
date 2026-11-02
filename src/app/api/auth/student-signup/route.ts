@@ -1,45 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const fullName = String(body.fullName ?? '').trim();
-    const matricNo = String(body.matricNo ?? '').trim().toUpperCase();
-    const email = String(body.email ?? '').trim().toLowerCase();
-    const password = String(body.password ?? '');
-
-    if (!fullName || !matricNo || !email || password.length < 8) {
-      return NextResponse.json({ error: 'Enter your name, matric number, Gmail, and a password of at least 8 characters.' }, { status: 400 });
-    }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) return NextResponse.json({ error: 'Registration service is not configured. Please contact the administrator.' }, { status: 503 });
-
-    const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data: byMatric, error: matricError } = await admin.from('profiles').select('id').eq('matric_no', matricNo).maybeSingle();
-    const { data: byEmail, error: emailError } = await admin.from('profiles').select('id').eq('email', email).maybeSingle();
-    if (matricError || emailError) return NextResponse.json({ error: 'Student records could not be checked. Please retry in a moment; if this continues, the registration service configuration needs attention.' }, { status: 503 });
-    if (byMatric || byEmail) return NextResponse.json({ error: 'That matric number or email is already registered. Please log in instead.' }, { status: 409 });
-
-    const { data, error } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName, matric_no: matricNo }
-    });
-    if (error || !data.user) {
-      const msg = error?.message?.toLowerCase() ?? '';
-      if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
-        return NextResponse.json({ error: 'That email is already registered. Try logging in or contact the administrator.' }, { status: 409 });
-      }
-      return NextResponse.json({ error: 'Could not create the student account. Check the details and try again.' }, { status: 400 });
-    }
-
-    // The database trigger creates the matching student profile from auth user metadata.
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: 'Could not create the student account. Please try again.' }, { status: 400 });
-  }
+const prefixes:Record<number,string>={100:'PSC 260',200:'PSC 250',300:'PSC 240',400:'PSC 230'};
+export async function POST(request:Request){
+ try{
+  const b=await request.json(), fullName=String(b.fullName??'').trim(),email=String(b.email??'').trim().toLowerCase(),password=String(b.password??''),level=Number(b.level),suffix=String(b.matricSuffix??'').replace(/[^0-9]/g,'');
+  if(!fullName||!email||password.length<8||!prefixes[level]||!suffix)return NextResponse.json({error:'Enter your full name, level, matric digits, Gmail and a password of at least 8 characters.'},{status:400});
+  const matricNo=prefixes[level]+' '+suffix,url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!url||!key)return NextResponse.json({error:'Registration service is not configured.'},{status:503});
+  const db=createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
+  const [m,e]=await Promise.all([db.from('profiles').select('id').eq('matric_no',matricNo).maybeSingle(),db.from('profiles').select('id').eq('email',email).maybeSingle()]);
+  if(m.error||e.error)return NextResponse.json({error:'Could not verify registration details.'},{status:503});
+  if(m.data||e.data)return NextResponse.json({error:'That matric number or email is already registered.'},{status:409});
+  const {data,error}=await db.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:fullName,matric_no:matricNo,level}});
+  if(error||!data.user)return NextResponse.json({error:error?.message??'Could not create account.'},{status:400});
+  return NextResponse.json({success:true,message:'Registration submitted. Your level administrator must approve your account before login.'});
+ }catch{return NextResponse.json({error:'Could not create account. Please try again.'},{status:400});}
 }
