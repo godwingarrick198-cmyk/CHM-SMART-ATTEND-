@@ -10,7 +10,7 @@ export default function Home() {
   const [fullName, setFullName] = useState('');
   const [matricNo, setMatricNo] = useState('');
   const [level,setLevel]=useState('100');
-  const prefixes:Record<string,string>={'100':'26','200':'25','300':'24','400':'23'};
+  const prefixes:Record<string,string>={'100':'PSC26','200':'PSC25','300':'PSC24','400':'PSC23'};
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
@@ -80,12 +80,12 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="authForm">
             {mode === 'signup' && <>
               <label>Full name<input autoComplete="name" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Enter your name" /></label>
-              <label>Study level<select required value={level} onChange={e=>{setLevel(e.target.value);setMatricNo("");}}><option value="100">100 Level</option><option value="200">200 Level</option><option value="300">300 Level</option><option value="400">400 Level</option></select></label><label>Matriculation number<div style={{display:"flex",gap:8,alignItems:"center"}}><strong>{prefixes[level]}</strong><input required inputMode="numeric" pattern="[0-9]+" value={matricNo} onChange={e=>setMatricNo(e.target.value.replace(/[^0-9]/g,""))} placeholder="Remaining digits" /></div></label>
+              <label>Study level<select required value={level} onChange={e=>{setLevel(e.target.value);setMatricNo("");}}><option value="100">100 Level</option><option value="200">200 Level</option><option value="300">300 Level</option><option value="400">400 Level</option></select></label><label>Matriculation number<div style={{display:"flex",gap:8,alignItems:"center"}}><strong>{prefixes[level]}</strong><input required inputMode="numeric" pattern="[0-9]+" value={matricNo} onChange={e=>setMatricNo(e.target.value.replace(/[^0-9]/g,""))} placeholder="Enter remaining digits" /></div></label>
               <label>Gmail address<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@gmail.com" /></label>
               <label>Password<input type="password" autoComplete="new-password" minLength={8} required value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
             </>}
             {mode === 'login' && <>
-              <label>Matriculation number<input required value={matricNo} onChange={e => setMatricNo(e.target.value)} placeholder="Enter your matric number" /></label>
+              <label>Matriculation number<input required value={matricNo} onChange={e => setMatricNo(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="e.g. PSC2407896" /></label>
               <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" /></label>
             </>}
             <button className="submitButton" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in to portal' : 'Create student account'} <span>↗</span></button>
