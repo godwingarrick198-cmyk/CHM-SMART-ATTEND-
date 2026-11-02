@@ -8,7 +8,7 @@ type Mode = 'login' | 'signup';
 export default function Home() {
   const [mode, setMode] = useState<Mode>('login');
   const [fullName, setFullName] = useState('');
-  const [matricNo, setMatricNo] = useState('');
+  const [matricNo, setMatricNo] = useState('');\n  const [level,setLevel]=useState('100');\n  const prefixes:Record<string,string>={'100':'PSC 260','200':'PSC 250','300':'PSC 240','400':'PSC 230'};
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
@@ -23,11 +23,11 @@ export default function Home() {
         const response = await fetch('/api/auth/student-signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fullName: fullName.trim(), matricNo: matricNo.trim().toUpperCase(), email: email.trim().toLowerCase(), password })
+          body: JSON.stringify({ fullName: fullName.trim(), level:Number(level), matricSuffix:matricNo.trim(), email: email.trim().toLowerCase(), password })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Could not create account. Please try again.');
-        setNotice('Student account created. You can now log in with your matric number and password.');
+        setNotice('Registration submitted. Wait for your level administrator to approve your account.');
         setMode('login');
         setPassword('');
       } else {
@@ -78,7 +78,7 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="authForm">
             {mode === 'signup' && <>
               <label>Full name<input autoComplete="name" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Enter your name" /></label>
-              <label>Matriculation number<input required value={matricNo} onChange={e => setMatricNo(e.target.value)} placeholder="e.g. CHM/2024/0001" /></label>
+              <label>Study level<select required value={level} onChange={e=>{setLevel(e.target.value);setMatricNo("");}}><option value="100">100 Level</option><option value="200">200 Level</option><option value="300">300 Level</option><option value="400">400 Level</option></select></label><label>Matriculation number<div style={{display:"flex",gap:8,alignItems:"center"}}><strong>{prefixes[level]}</strong><input required inputMode="numeric" pattern="[0-9]+" value={matricNo} onChange={e=>setMatricNo(e.target.value.replace(/[^0-9]/g,""))} placeholder="Remaining digits" /></div></label>
               <label>Gmail address<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@gmail.com" /></label>
               <label>Password<input type="password" autoComplete="new-password" minLength={8} required value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
             </>}
