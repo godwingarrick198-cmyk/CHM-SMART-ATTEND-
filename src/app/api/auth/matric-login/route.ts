@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 export async function POST(request:Request){
  try{
-  const b=await request.json(),matricNo=String(b.matricNo??'').trim().toUpperCase().replace(/\\s+/g,' '),password=String(b.password??'');
+  const b=await request.json(),matricNo=String(b.matricNo??'') .trim().toUpperCase().replace(/[\\s-]+/g,''),password=String(b.password??'');
   if(!matricNo||!password)return NextResponse.json({error:'Enter your matric number and password.'},{status:400});
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL,anon=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!url||!anon||!key)return NextResponse.json({error:'Login service is not configured.'},{status:503});
