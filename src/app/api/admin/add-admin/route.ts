@@ -29,7 +29,7 @@ export async function POST(request:NextRequest){
   if(error||!inv.user)return NextResponse.json({error:error?.message??'Invitation failed.'},{status:400});
   authUserId=inv.user.id;invited=true;
  }
- const {error:insertError}=await db.from('admin_users').insert({email,auth_user_id:authUserId,active:true,phone_e164:null,role:'level_admin',level});
+ const {error:insertError}=await db.from('admin_users').insert({email,auth_user_id:authUserId,active:true,role:'level_admin',level});
  if(insertError){
   if(invited)await db.auth.admin.deleteUser(authUserId);
   return NextResponse.json({error:'Could not save administrator assignment: '+insertError.message},{status:500});
