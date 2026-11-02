@@ -8,7 +8,9 @@ type Mode = 'login' | 'signup';
 export default function Home() {
   const [mode, setMode] = useState<Mode>('login');
   const [fullName, setFullName] = useState('');
-  const [matricNo, setMatricNo] = useState('');\n  const [level,setLevel]=useState('100');\n  const prefixes:Record<string,string>={'100':'PSC 260','200':'PSC 250','300':'PSC 240','400':'PSC 230'};
+  const [matricNo, setMatricNo] = useState('');
+  const [level,setLevel]=useState('100');
+  const prefixes:Record<string,string>={'100':'PSC 260','200':'PSC 250','300':'PSC 240','400':'PSC 230'};
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
