@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-const prefixes:Record<number,string>={100:'26',200:'25',300:'24',400:'23'};
+const prefixes:Record<number,string>={100:'PSC26',200:'PSC25',300:'PSC24',400:'PSC23'};
 export async function POST(request:Request){
  try{
   const b=await request.json(), fullName=String(b.fullName??'').trim(),email=String(b.email??'').trim().toLowerCase(),password=String(b.password??''),level=Number(b.level),suffix=String(b.matricSuffix??'').replace(/[^0-9]/g,'');
   if(!fullName||!email||password.length<8||!prefixes[level]||!suffix)return NextResponse.json({error:'Enter your full name, level, matric digits, Gmail and a password of at least 8 characters.'},{status:400});
-  const matricNo=prefixes[level]+' '+suffix,url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const matricNo=prefixes[level]+suffix,url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!url||!key)return NextResponse.json({error:'Registration service is not configured.'},{status:503});
   const db=createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
   const [m,e]=await Promise.all([db.from('profiles').select('id').eq('matric_no',matricNo).maybeSingle(),db.from('profiles').select('id').eq('email',email).maybeSingle()]);
