@@ -9,6 +9,27 @@ export default function AdminLoginPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
 
+  async function requestPasswordReset() {
+    if (!email.trim()) {
+      setNotice('Enter the prime administrator email first.');
+      return;
+    }
+    setBusy(true);
+    setNotice('');
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin + '/admin/reset-password',
+      });
+      if (error) throw error;
+      setNotice('If this email belongs to the prime administrator, a secure password reset link has been sent. Check the inbox and spam folder.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not request a password reset.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -55,6 +76,7 @@ export default function AdminLoginPage() {
             <label>Administrator Gmail<input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter administrator Gmail" /></label>
             <label>Password<input type="password" autoComplete="current-password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter administrator password" /></label>
             <button className="submitButton" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in to admin dashboard'} <span>↗</span></button>
+            <button type="button" className="dashGhost" disabled={busy} onClick={requestPasswordReset}>Forgot password? Send reset link</button>
           </form>
           {notice && <div className="notice" role="status">{notice}</div>}
           <div className="cardBottom"><span className="lockIcon">▣</span> Public administrator signup is disabled</div>
