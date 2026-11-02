@@ -12,7 +12,7 @@ export async function POST(request:NextRequest){
  if(!a||a.role!=='prime_admin'||String(a.email).toLowerCase()!=='godwingarrick198@gmail.com')return NextResponse.json({error:'Only the prime administrator can invite level administrators.'},{status:403});
  let body:any;try{body=await request.json()}catch{return NextResponse.json({error:'Invalid request.'},{status:400})}
  const email=String(body.email??'').trim().toLowerCase(),level=Number(body.level);
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||![100,200,300,400].includes(level))return NextResponse.json({error:'Enter a valid email and level.'},{status:400});
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||![100,200,300,400].includes(level))return NextResponse.json({error:'Enter a valid email and level.'},{status:400});
  if(email==='godwingarrick198@gmail.com')return NextResponse.json({error:'Prime administrator is already configured.'},{status:409});
  const [{data:adminExists,error:adminCheckError},{data:studentExists,error:studentCheckError}]=await Promise.all([
   db.from('admin_users').select('id').ilike('email',email).limit(1),
