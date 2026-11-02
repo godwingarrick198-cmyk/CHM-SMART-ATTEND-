@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-const prefixes:Record<number,string>={100:'PSC 260',200:'PSC 250',300:'PSC 240',400:'PSC 230'};
+const prefixes:Record<number,string>={100:'26',200:'25',300:'24',400:'23'};
 export async function POST(request:Request){
  try{
   const b=await request.json(), fullName=String(b.fullName??'').trim(),email=String(b.email??'').trim().toLowerCase(),password=String(b.password??''),level=Number(b.level),suffix=String(b.matricSuffix??'').replace(/[^0-9]/g,'');
