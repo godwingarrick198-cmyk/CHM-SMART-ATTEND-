@@ -14,9 +14,13 @@ export async function POST(request:NextRequest){
  const email=String(body.email??'').trim().toLowerCase(),level=Number(body.level);
  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||![100,200,300,400].includes(level))return NextResponse.json({error:'Enter a valid email and level.'},{status:400});
  if(email==='godwingarrick198@gmail.com')return NextResponse.json({error:'Prime administrator is already configured.'},{status:409});
- const {data:exists}=await db.from('admin_users').select('id').ilike('email',email).maybeSingle();
- if(exists)return NextResponse.json({error:'This email is already an administrator.'},{status:409});
- const {data:inv,error}=await db.auth.admin.inviteUserByEmail(email,{redirectTo:`${process.env.NEXT_PUBLIC_SITE_URL??request.nextUrl.origin}/admin/reset-password`});
+ const [{data:adminExists,error:adminCheckError},{data:studentExists,error:studentCheckError}]=await Promise.all([
+  db.from('admin_users').select('id').ilike('email',email).limit(1),
+  db.from('profiles').select('id').ilike('email',email).limit(1)
+ ]);
+ if(adminCheckError||studentCheckError)return NextResponse.json({error:'Could not verify whether this email is already registered. Please try again.'},{status:500});
+ if(adminExists?.length||studentExists?.length)return NextResponse.json({error:'This email is already registered in the system. Use a new email address.'},{status:409});
+ const {data:inv,error}=await db.auth.admin.inviteUserByEmail(email,{data:{account_type:'level_admin',admin_level:level},redirectTo:`${process.env.NEXT_PUBLIC_SITE_URL??request.nextUrl.origin}/admin/reset-password`});
  if(error||!inv.user)return NextResponse.json({error:error?.message??'Invitation failed.'},{status:400});
  const {error:ie}=await db.from('admin_users').insert({email,auth_user_id:inv.user.id,active:true,phone_e164:null,role:'level_admin',level});
  if(ie){await db.auth.admin.deleteUser(inv.user.id);return NextResponse.json({error:'Could not save administrator assignment: '+ie.message},{status:500})}
