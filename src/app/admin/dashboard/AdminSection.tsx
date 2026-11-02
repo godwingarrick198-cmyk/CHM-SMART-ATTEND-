@@ -5,7 +5,7 @@ import {usePathname} from 'next/navigation';
 import {createClient} from '@/lib/supabase/client';
 type Level=100|200|300|400;
 const levels:Level[]=[100,200,300,400];
-const prefixes:Record<number,string>={100:'PSC 260',200:'PSC 250',300:'PSC 240',400:'PSC 230'};
+const prefixes:Record<number,string>={100:'26',200:'25',300:'24',400:'23'};
 const LocationMap=dynamic(()=>import('./LocationMap'),{ssr:false,loading:()=> <div className="mapLoading">Loading interactive map…</div>});
 export default function AdminSection(){
  const path=usePathname(),db=createClient();
@@ -48,7 +48,7 @@ export default function AdminSection(){
   if(!prime)return;
   const rows=courses.filter(c=>level==='all'||Number(c.level)===level).sort((a,b)=>Number(a.level)-Number(b.level)||String(a.course_code).localeCompare(String(b.course_code)));
   if(!rows.length){setNote('No courses are available for that selection yet.');return;}
-  const safe=(v:any)=>String(v??'').normalize('NFKD').replace(/[^\\x20-\\x7E]/g,'').replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)');
+  const safe=(v:any)=>String(v??'').normalize('NFKD').replace(/[^\x20-\x7E]/g,'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
   const pages:any[][]=[];for(let i=0;i<rows.length;i+=24)pages.push(rows.slice(i,i+24));
   const objects:string[]=[];const pageIds:number[]=[];
   objects.push('<< /Type /Catalog /Pages 2 0 R >>');
@@ -84,7 +84,7 @@ export default function AdminSection(){
   const rows=permitted.filter(s=>level==='all'||Number(s.level)===level)
    .sort((a,b)=>Number(a.level)-Number(b.level)||String(a.full_name||'').localeCompare(String(b.full_name||'')));
   if(!rows.length){setNote('No student records are available for that level yet.');return;}
-  const safe=(v:any)=>String(v??'').normalize('NFKD').replace(/[^\\x20-\\x7E]/g,'').replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)');
+  const safe=(v:any)=>String(v??'').normalize('NFKD').replace(/[^\x20-\x7E]/g,'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
   const chunks:any[][]=[];for(let i=0;i<rows.length;i+=27)chunks.push(rows.slice(i,i+27));
   const objects:string[]=['<< /Type /Catalog /Pages 2 0 R >>','',
    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
