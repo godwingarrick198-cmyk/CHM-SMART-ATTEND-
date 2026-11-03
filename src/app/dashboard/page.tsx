@@ -31,30 +31,92 @@ export default function StudentDashboard() {
   useEffect(() => { void load(); const timer = window.setInterval(() => setNowMs(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   function distanceMetres(lat1:number,lon1:number,lat2:number,lon2:number){const rad=(v:number)=>v*Math.PI/180;const dLat=rad(lat2-lat1),dLon=rad(lon2-lon1);const a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;return 6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
   async function checkIn(sessionId: string) {
-    setNotice('Requesting a fresh, high-accuracy GPS reading…'); setBusyId(sessionId);
-    if (!navigator.geolocation) { setNotice('Your browser does not support GPS location.'); setBusyId(''); return; }
-    navigator.geolocation.getCurrentPosition(async pos => {
-      try {
-        const accuracy = Math.round(pos.coords.accuracy);
-        // Let the server perform the authoritative geofence check. A phone's reported
-        // GPS accuracy can be poor indoors, so do not reject locally before the RPC.
-        const { error } = await supabase.rpc('student_check_in', { p_session_id: sessionId, p_latitude: pos.coords.latitude, p_longitude: pos.coords.longitude });
-        if (error) throw error;
-        setNotice(`Attendance recorded successfully. GPS accuracy: about ±${accuracy} metres.`); await load();
-      } catch (e) { setNotice(e instanceof Error ? e.message : 'Check-in failed.'); }
-      finally { setBusyId(''); }
-    }, (error) => {
-      let message = 'Could not get your location. Turn on Location on your phone and try again.';
-      if (error.code === error.PERMISSION_DENIED) {
-        message = 'Location access was blocked. On your phone, open Chrome Settings → Site settings → Location, allow chm-smart-attend.vercel.app, then return here and tap Check in with GPS again. Also make sure phone Location is turned on.';
-      } else if (error.code === error.POSITION_UNAVAILABLE) {
-        message = 'Your phone could not determine your location. Turn on phone Location/GPS, move somewhere with a clearer signal, and try again.';
-      } else if (error.code === error.TIMEOUT) {
-        message = 'Location lookup timed out. Turn on phone Location/GPS and try again.';
-      }
-      setNotice(message);
+    setBusyId(sessionId);
+    setNotice('Finding your most accurate GPS location… Keep your phone still for a few seconds.');
+    if (!navigator.geolocation) {
+      setNotice('Your browser does not support GPS location.');
       setBusyId('');
-    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+      return;
+    }
+
+    type LocationFix = { latitude: number; longitude: number; accuracy: number; timestamp: number };
+    const getBestLocation = () => new Promise<LocationFix>((resolve, reject) => {
+      const fixes: LocationFix[] = [];
+      let watchId: number | null = null;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        window.clearTimeout(timer);
+        if (fixes.length === 0) {
+          reject(new Error('Your phone could not determine your location. Turn on Location/GPS, move somewhere with a clearer signal, and try again.'));
+          return;
+        }
+        fixes.sort((a, b) => a.accuracy - b.accuracy);
+        resolve(fixes[0]);
+      };
+      const timer = window.setTimeout(finish, 10000);
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          position => {
+            const fix: LocationFix = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: position.timestamp
+            };
+            if (Number.isFinite(fix.latitude) && Number.isFinite(fix.longitude) &&
+                Number.isFinite(fix.accuracy) && fix.accuracy > 0 &&
+                Date.now() - fix.timestamp < 15000) {
+              fixes.push(fix);
+            }
+            // Collect several fresh readings, then use the one with the smallest
+            // reported uncertainty. The database remains the authority on the geofence.
+            if (fixes.length >= 4) finish();
+          },
+          error => {
+            if (fixes.length > 0) finish();
+            else if (error.code === error.PERMISSION_DENIED) {
+              if (!settled) {
+                settled = true;
+                if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+                window.clearTimeout(timer);
+                reject(new Error('Location access was blocked. Allow location for chm-smart-attend.vercel.app in Chrome site settings, and make sure phone Location is turned on.'));
+              }
+            } else if (error.code === error.TIMEOUT && fixes.length === 0) {
+              if (!settled) {
+                settled = true;
+                if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+                window.clearTimeout(timer);
+                reject(new Error('Location lookup timed out. Turn on phone Location/GPS and try again.'));
+              }
+            }
+          },
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
+      } catch {
+        window.clearTimeout(timer);
+        reject(new Error('Could not start GPS location. Check your browser permissions and try again.'));
+      }
+    });
+
+    try {
+      const bestFix = await getBestLocation();
+      setNotice(`GPS fix found (about ±${Math.round(bestFix.accuracy)} m). Verifying your classroom location…`);
+      const { error } = await supabase.rpc('student_check_in', {
+        p_session_id: sessionId,
+        p_latitude: bestFix.latitude,
+        p_longitude: bestFix.longitude
+      });
+      if (error) throw error;
+      setNotice(`Attendance recorded successfully. Used your best GPS reading (about ±${Math.round(bestFix.accuracy)} metres).`);
+      await load();
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Check-in failed.');
+    } finally {
+      setBusyId('');
+    }
   }
   const normalizeCourseCode = (value?: string | null) => (value || 'Unassigned').trim().replace(/\\s+/g, ' ').toUpperCase();
   const courseTotals = courseSessions
