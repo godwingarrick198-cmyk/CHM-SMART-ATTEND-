@@ -79,38 +79,71 @@ export default function AdminSection(){
  }
 
 
- function downloadStudentsPdf(level:number|'all'){
-  const permitted=students.filter(s=>scope(Number(s.level)));
-  const rows=permitted.filter(s=>level==='all'||Number(s.level)===level)
-   .sort((a,b)=>Number(a.level)-Number(b.level)||String(a.full_name||'').localeCompare(String(b.full_name||'')));
-  if(!rows.length){setNote('No student records are available for that level yet.');return;}
-  const safe=(v:any)=>String(v??'').normalize('NFKD').replace(/[^\x20-\x7E]/g,'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
-  const chunks:any[][]=[];for(let i=0;i<rows.length;i+=27)chunks.push(rows.slice(i,i+27));
-  const objects:string[]=['<< /Type /Catalog /Pages 2 0 R >>','',
-   '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-   '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];
-  const pageIds:number[]=[];
-  chunks.forEach((chunk,index)=>{
-   const pageId=objects.length+1,contentId=pageId+1;pageIds.push(pageId);
-   const title=level==='all'?'All Levels Student Register':String(level)+' Level Student Register';
-   let stream='BT /F2 16 Tf 40 800 Td (CHM SMART ATTEND) Tj 0 -23 Td /F2 12 Tf ('+safe(title)+') Tj 0 -18 Td /F1 9 Tf ('+safe('Generated: '+new Date().toLocaleDateString()+' | Total students: '+rows.length)+' ) Tj 0 -24 Td /F2 8 Tf (NAME | MATRIC NUMBER | EMAIL | LEVEL | STATUS) Tj 0 -15 Td /F1 7 Tf ';
-   chunk.forEach((s,i)=>{
-    const line=[s.full_name||'N/A',s.matric_no||'N/A',s.email||'N/A',String(s.level||'N/A')+' Level',s.approval_status||'N/A'].join(' | ');
-    stream+='('+safe(line.slice(0,145))+') Tj 0 -27 Td ';
+ async function downloadStudentsPdf(level:number|'all'){
+  const pageSize=1000;
+  async function fetchAll<T>(makeQuery:(from:number,to:number)=>Promise<{data:T[]|null,error:any}>):Promise<T[]>{
+   const result:T[]=[];
+   for(let from=0;from<100000;from+=pageSize){
+    const {data,error}=await makeQuery(from,from+pageSize-1);
+    if(error)throw error;
+    const batch=data??[];result.push(...batch);
+    if(batch.length<pageSize)return result;
+   }
+   throw new Error('Too many records to export in one request.');
+  }
+  setBusy(true);setNote('Preparing the student attendance report…');
+  try{
+   const allStudents=await fetchAll<any>((from,to)=>db.from('profiles').select('id,full_name,matric_no,email,level,approval_status').order('level').order('full_name').range(from,to));
+   const scopedStudents=allStudents.filter(s=>scope(Number(s.level))&&(level==='all'||Number(s.level)===level));
+   if(!scopedStudents.length)throw new Error('No student records are available for that level yet.');
+   const completedSessions=await fetchAll<any>((from,to)=>db.from('attendance_sessions').select('id,level,ends_at').lte('ends_at',new Date().toISOString()).order('ends_at').range(from,to));
+   const scopedSessions=completedSessions.filter(s=>scope(Number(s.level))&&(level==='all'||Number(s.level)===level));
+   const sessionsByLevel=new Map<number,number>();
+   scopedSessions.forEach(s=>sessionsByLevel.set(Number(s.level),(sessionsByLevel.get(Number(s.level))??0)+1));
+   const attendedByStudent=new Map<string,Set<string>>();
+   for(let i=0;i<scopedSessions.length;i+=100){
+    const ids=scopedSessions.slice(i,i+100).map(s=>s.id);
+    if(!ids.length)continue;
+    const records=await fetchAll<any>((from,to)=>db.from('attendance_records').select('student_id,session_id').in('session_id',ids).range(from,to));
+    records.forEach(r=>{
+     if(!attendedByStudent.has(r.student_id))attendedByStudent.set(r.student_id,new Set());
+     attendedByStudent.get(r.student_id)!.add(r.session_id);
+    });
+   }
+   const rows=scopedStudents.map(s=>{
+    const held=sessionsByLevel.get(Number(s.level))??0;
+    const attended=attendedByStudent.get(s.id)?.size??0;
+    return {...s,held,attended,percentage:held?Math.min(100,Math.round(attended/held*100)):0};
+   }).sort((a,b)=>Number(a.level)-Number(b.level)||String(a.full_name??'').localeCompare(String(b.full_name??'')));
+   const safe=(v:any)=>String(v??'').normalize('NFKD').replace(/[^\\x20-\\x7E]/g,'').replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)');
+   const chunks:any[][]=[];for(let i=0;i<rows.length;i+=25)chunks.push(rows.slice(i,i+25));
+   const objects:string[]=['<< /Type /Catalog /Pages 2 0 R >>','',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];
+   const pageIds:number[]=[];
+   chunks.forEach(chunk=>{
+    const pageId=objects.length+1,contentId=pageId+1;pageIds.push(pageId);
+    const title=level==='all'?'All Levels Attendance Register':String(level)+' Level Attendance Register';
+    let stream='BT /F2 15 Tf 34 805 Td (CHM SMART ATTEND) Tj 0 -22 Td /F2 11 Tf ('+safe(title)+') Tj 0 -17 Td /F1 8 Tf ('+safe('Generated: '+new Date().toLocaleDateString()+' | Students: '+rows.length)+' ) Tj 0 -23 Td /F2 7 Tf (NAME | MATRIC NO. | EMAIL | LEVEL | ATTENDED / HELD | ATTENDANCE | STATUS) Tj 0 -15 Td /F1 6 Tf ';
+    chunk.forEach(s=>{
+     const line=[s.full_name||'N/A',s.matric_no||'N/A',s.email||'N/A',String(s.level||'N/A'),s.attended+' / '+s.held,s.held?s.percentage+'%':'N/A',s.approval_status||'N/A'].join(' | ');
+     stream+='('+safe(line.slice(0,175))+') Tj 0 -29 Td ';
+    });
+    stream+='ET';
+    objects.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+contentId+' 0 R >>');
+    objects.push('<< /Length '+stream.length+' >>\\nstream\\n'+stream+'\\nendstream');
    });
-   stream+='ET';
-   objects.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+contentId+' 0 R >>');
-   objects.push('<< /Length '+stream.length+' >>\\nstream\\n'+stream+'\\nendstream');
-  });
-  objects[1]='<< /Type /Pages /Kids ['+pageIds.map(id=>id+' 0 R').join(' ')+'] /Count '+pageIds.length+' >>';
-  let pdf='%PDF-1.4\\n',offsets=[0];
-  objects.forEach((obj,i)=>{offsets.push(pdf.length);pdf+=(i+1)+' 0 obj\\n'+obj+'\\nendobj\\n';});
-  const xref=pdf.length;pdf+='xref\\n0 '+(objects.length+1)+'\\n0000000000 65535 f \\n';
-  for(let i=1;i<offsets.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \\n';
-  pdf+='trailer\\n<< /Size '+(objects.length+1)+' /Root 1 0 R >>\\nstartxref\\n'+xref+'\\n%%EOF';
-  const blob=new Blob([new TextEncoder().encode(pdf)],{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='CHM-Student-Register-'+(level==='all'?'All-Levels':level+'-Level')+'.pdf';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-  setNote('Student register PDF downloaded: '+rows.length+' student(s).');
+   objects[1]='<< /Type /Pages /Kids ['+pageIds.map(id=>id+' 0 R').join(' ')+'] /Count '+pageIds.length+' >>';
+   let pdf='%PDF-1.4\\n',offsets=[0];
+   objects.forEach((obj,i)=>{offsets.push(pdf.length);pdf+=(i+1)+' 0 obj\\n'+obj+'\\nendobj\\n';});
+   const xref=pdf.length;pdf+='xref\\n0 '+(objects.length+1)+'\\n0000000000 65535 f \\n';
+   for(let i=1;i<offsets.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \\n';
+   pdf+='trailer\\n<< /Size '+(objects.length+1)+' /Root 1 0 R >>\\nstartxref\\n'+xref+'\\n%%EOF';
+   const blob=new Blob([new TextEncoder().encode(pdf)],{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+   a.href=url;a.download='CHM-Student-Attendance-'+(level==='all'?'All-Levels':level+'-Level')+'.pdf';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+   setNote('Attendance PDF downloaded: '+rows.length+' student(s). Percentages use completed sessions for each student’s level.');
+  }catch(e){setNote(e instanceof Error?e.message:'Could not generate the student attendance PDF.');}
+  finally{setBusy(false);}
  }
 
  const visibleStudents=students.filter(s=>scope(s.level)),visibleCourses=courses.filter(c=>scope(c.level)),visibleSessions=sessions.filter(s=>scope(s.level)),visibleRecords=records.filter(r=>scope(r.attendance_sessions?.level));
