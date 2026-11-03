@@ -81,7 +81,7 @@ export default function AdminSection(){
 
  async function downloadStudentsPdf(level:number|'all'){
   const pageSize=1000;
-  async function fetchAll<T>(makeQuery:(from:number,to:number)=>Promise<{data:T[]|null,error:any}>):Promise<T[]>{
+  async function fetchAll<T>(makeQuery:(from:number,to:number)=>PromiseLike<{data:T[]|null,error:any}>):Promise<T[]>{
    const result:T[]=[];
    for(let from=0;from<100000;from+=pageSize){
     const {data,error}=await makeQuery(from,from+pageSize-1);
